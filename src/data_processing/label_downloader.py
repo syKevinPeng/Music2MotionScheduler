@@ -21,8 +21,11 @@ class LabelDownloader:
         result = np.empty((2, frame_count), dtype=object)
 
         assert len(data['projects'].values()) == 1
-        assert len(next(iter(data['projects'].values()))['labels']) == 1
+        # assert len(next(iter(data['projects'].values()))['labels']) == 1
 
+        if len(next(iter(data['projects'].values()))['labels']) == 0:
+            # print(f'no label for {file_name}')
+            return file_name, result
 
         frames=next(iter(data['projects'].values()))['labels'][0]['annotations']['frames']
         frames = [(int(k),v) for k,v in frames.items()]
@@ -127,15 +130,21 @@ if __name__ == '__main__':
     import pickle
 
     output_dir = Path("/fs/nexus-projects/PhysicsFall/data/motorica_dance_dataset")
+
     if not output_dir.exists():
         raise FileNotFoundError(f"Output directory not found: {output_dir}")
+    
+    output_dir = output_dir/"label"
+    if not output_dir.exists():
+        output_dir.mkdir(parents=True, exist_ok=True)
     
     # Initialize the LabelDownloader
     downloader = LabelDownloader(LB_API_KEY)
     all_label = downloader.load_labeling(task_id)
+    for file_name, label in all_label.items():
+        # save label to npy file
+        with open(output_dir/ f"{file_name.split('.')[0]}.pkl", 'wb') as f:
+            pickle.dump(label, f)
    
-    # Save the processed labels to a file
-    with open(output_dir / 'all_label.pkl', 'wb') as f:
-        pickle.dump(all_label, f)
 
     

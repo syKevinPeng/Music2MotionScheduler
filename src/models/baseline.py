@@ -2,8 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
+import lightning as pl
 
-class Baseline(nn.Module):
+class Baseline(pl.LightningModule):
     def __init__(
         self,
         input_dim: int = 128,  # Jukebox embedding dimension
@@ -52,5 +53,46 @@ class Baseline(nn.Module):
         
         # Predict labels for all positions
         logits = self.classifier(x)  # (B, S, num_labels)
-        
+        # Apply softmax to get probabilities
+        logits = F.softmax(logits, dim=-1)
         return logits
+    
+    def configure_optimizers(self):
+        optimizer = torch.optim.AdamW(self.parameters(), lr=1e-4)
+        return optimizer
+    
+    def loss_function(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            logits: (batch_size, seq_length, num_labels)
+            labels: (batch_size, seq_length, num_labels)
+        Returns:
+            loss: scalar tensor
+        """
+        # Reshape logits and labels for loss calculation
+        logits = logits.view(-1, logits.size(-1))
+        labels = labels.view(-1, logits.size(-1))
+        
+        # Calculate loss
+        loss = F.cross_entropy(logits, labels)
+        
+        return loss
+    def training_step(self, batch, batch_idx):
+        audio_feature, label = batch
+        logits = self(audio_feature)
+        print(f'output shape: {logits.shape}, label shape: {label.shape}')
+        loss = self.loss_function(logits, label)
+        
+        # Log the loss
+        self.log('train_loss', loss)
+        
+        return loss
+    
+    def prediction_step(self, batch, batch_idx):
+        audio_feature, label = batch
+        logits = self(audio_feature)
+        
+        # Get the predicted labels
+        _, predicted_labels = torch.max(logits, dim=-1)
+        
+        return predicted_labels
