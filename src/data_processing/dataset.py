@@ -78,16 +78,17 @@ class Dataset(torch.utils.data.Dataset):
             vectorized_label_converter = np.frompyfunc(self.label_converter.subclass_label_to_one_hot, 1, 1)
         else:
             vectorized_label_converter = np.frompyfunc(self.label_converter.subclass_label_to_number, 1, 1)
-        label = vectorized_label_converter(label[:,1]).astype(np.int16)
+        subclass_label =vectorized_label_converter(label[:,1])
+        subclass_label = np.stack(subclass_label).astype(np.int16)
         audio_feature = torch.tensor(audio_feature).float().to(self.device)
-        label = torch.tensor(label, dtype=torch.int16).to(self.device)
-        return audio_feature, label
+        subclass_label = torch.tensor(subclass_label, dtype=torch.float32).to(self.device)
+        return audio_feature, subclass_label
     
 
 class SchdulerDataModule(pl.LightningDataModule):
-    def __init__(self, dataset_path:str, label_path:str, batch_size:int=32):
+    def __init__(self, dataset_path:str, batch_size:int=32):
         super().__init__()
-        self.dataset = Dataset(dataset_path, label_path)
+        self.dataset = Dataset(dataset_path)
         self.batch_size = batch_size
 
     def setup(self, stage=None):

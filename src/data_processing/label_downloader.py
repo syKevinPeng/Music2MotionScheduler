@@ -139,12 +139,12 @@ if __name__ == '__main__':
         output_dir.mkdir(parents=True, exist_ok=True)
     
     # Initialize the LabelDownloader
-    downloader = LabelDownloader(LB_API_KEY)
+    downloader = LabelDownloader(LB_API_KEY, update_ontology_cache = True)
     all_label = downloader.load_labeling(task_id)
-    for file_name, label in all_label.items():
-        # save label to npy file
-        with open(output_dir/ f"{file_name.split('.')[0]}.pkl", 'wb') as f:
-            pickle.dump(label, f)
+    # for file_name, label in all_label.items():
+    #     # save label to npy file
+    #     with open(output_dir/ f"{file_name.split('.')[0]}.pkl", 'wb') as f:
+    #         pickle.dump(label, f)
    
 
     

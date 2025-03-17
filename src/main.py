@@ -8,8 +8,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 import torch
 from pathlib import Path
 
-data_path = Path("/fs/nexus-projects/PhysicsFall/data/Motorica_beats/sliced_audio_features417")
-label_path = Path("/fs/nexus-projects/PhysicsFall/data/motorica_dance_dataset/all_label.pkl")
+data_path = "/fs/nexus-projects/PhysicsFall/data/motorica_beats"
 saving_dir = Path("/fs/nexus-projects/PhysicsFall/Music2MotionScheduler/ckpt")
 
 max_epochs = 50
@@ -21,7 +20,7 @@ wandb_logger = WandbLogger(project='Music2MotionScheduler',
                             notes = "debugging")
 
 # Initialize dataset and model
-data_module = SchdulerDataModule(dataset_path = data_path, label_path = label_path)
+data_module = SchdulerDataModule(dataset_path = data_path)
 batch_size, train_dummy_data, val_dummy_data=data_module.setup()
 seq_length, input_dim = train_dummy_data[0].shape
 model = baseline.Baseline(
