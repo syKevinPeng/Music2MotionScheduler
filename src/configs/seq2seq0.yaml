@@ -1,0 +1,27 @@
+MODEL:
+  NAME: "seq2seq"
+  INPUT_DIM: 4800
+  NUM_LABELS: 233
+  EMBED_DIM: 256  #Embedding dimsion for dance labels
+  HIDDEN_DIM: 256
+  NUM_LAYERS: 2
+  DROPOUT: 0.3
+  LEARNING_RATE: 0.001
+  TEACHER_FORCING_RATIO: 0.5
+  MAX_OUTPUT_LEN: 150
+
+
+WANDB:
+  NAME: "seq2seq"
+  MODE: "disabled"
+  NOTES: "Seq2seq model"
+  SAVE_DIR: "/ihchomes/peng2000/editdance/Music2MotionScheduler/ckpt"
+
+DATASET:
+  PATH: "/ihchomes/peng2000/editdance/editable_dance_project/data/motorica_beats/"
+  LABEL_LIST_PATH: "/ihchomes/peng2000/editdance/Music2MotionScheduler/src/data_processing/class_list.txt"
+
+TRAIN:
+  MAX_EPOCHS: 1
+  BATCH_SIZE: 32
+  
