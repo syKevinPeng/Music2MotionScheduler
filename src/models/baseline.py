@@ -3,12 +3,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 import lightning as pl
+from .conformer import ConformerLayer
 
 class Baseline(pl.LightningModule):
     def __init__(
         self,
         input_dim: int = 128,  # Jukebox embedding dimension
-        num_labels: int = 10,  # Number of predefined dance labels
+        num_labels: int = 8,  # Number of predefined dance labels
         seq_length: int = 5,   # Number of 5s chunks (adjust based on input)
         d_model: int = 256,
         nhead: int = 8,
@@ -28,6 +29,12 @@ class Baseline(pl.LightningModule):
             batch_first=True
         )
         self.transformer_encoder = TransformerEncoder(encoder_layers, num_layers)
+        self.conformer_layer = ConformerLayer(
+            d_model=d_model,
+            dropout=dropout,
+            cnn_kernel_size= 31,
+            num_head = nhead,
+        )
         
         # Positional encoding (for sequence order)
         self.pos_encoder = nn.Parameter(torch.randn(1, seq_length, d_model))
@@ -44,6 +51,9 @@ class Baseline(pl.LightningModule):
         """
         # Project input
         x = self.input_proj(x)  # (B, S, d_model)
+
+        # Conformer layer
+        x = self.conformer_layer(x)
         
         # Add positional encoding
         x = x + self.pos_encoder
@@ -53,8 +63,6 @@ class Baseline(pl.LightningModule):
         
         # Predict labels for all positions
         logits = self.classifier(x)  # (B, S, num_labels)
-        # Apply softmax to get probabilities
-        logits = F.softmax(logits, dim=-1)
         return logits
     
     def configure_optimizers(self):
@@ -71,16 +79,22 @@ class Baseline(pl.LightningModule):
         """
         # Reshape logits and labels for loss calculation
         logits = logits.view(-1, logits.size(-1))
-        labels = labels.view(-1, logits.size(-1))
+        labels = labels.view(-1).to(torch.long)
+        assert labels.min() >= 0, f"Bad label: min={labels.min()}"
+        assert labels.max() < logits.size(-1), f"Bad label: max={labels.max()}, n_classes={logits.size(-1)}"
         
-        # Calculate loss
-        loss = F.cross_entropy(logits, labels)
+        # Calculate focal loss
+        ce_loss = F.cross_entropy(logits, labels)
+        alpha = 1.0
+        gamma = 2.0
+        pt = torch.exp(-ce_loss)
+        loss = alpha * (1-pt)**gamma * ce_loss
+        self.log('train_loss', loss)
         
         return loss
     def training_step(self, batch, batch_idx):
         audio_feature, label = batch
         logits = self(audio_feature)
-        print(f'output shape: {logits.shape}, label shape: {label.shape}')
         loss = self.loss_function(logits, label)
         
         # Log the loss

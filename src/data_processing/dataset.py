@@ -72,6 +72,9 @@ class Dataset(torch.utils.data.Dataset):
         label = np.load(label_file, allow_pickle=True).item()["data"]
         # print(f'audio_feature shape: {audio_feature.shape}') # 500 x 417
         # print(f'label shape: {label.shape}') # 500 x 2
+        if label.shape != torch.Size([1000, 2]):
+            print(f"Label shape mismatch: {label_file.stem}")
+        # exit()
        
         # convert label to number
         if self.label_format == "one_hot":
@@ -87,9 +90,9 @@ class Dataset(torch.utils.data.Dataset):
     
 
 class SchdulerDataModule(pl.LightningDataModule):
-    def __init__(self, dataset_path:str, batch_size:int=32):
+    def __init__(self, dataset_path:str, batch_size:int=32, label_format = "number"):
         super().__init__()
-        self.dataset = Dataset(dataset_path)
+        self.dataset = Dataset(dataset_path, label_format=label_format)
         self.batch_size = batch_size
 
     def setup(self, stage=None):
@@ -106,8 +109,16 @@ class SchdulerDataModule(pl.LightningDataModule):
 
 
 if __name__ == "__main__":
-    data_path = "/fs/nexus-projects/PhysicsFall/data/motorica_beats"
-    dataset = Dataset(data_path)
+    data_path = "/fs/nexus-projects/PhysicsFall/editable_dance_project/data/motorica_beats"
+    dataset = Dataset(data_path, label_format = "number")
+    audio_size = torch.Size([1000, 417])
+    subclass_size = torch.Size([1000, 233])
 
-    audio_feature, label = dataset[0]
+    for i in range(len(dataset)):
+        audio_feature, subclass_label = dataset[i]
+        print(f"Audio feature shape: {audio_feature.shape}")
+        print(f'label shape: {subclass_label.shape}')
+        exit()
+        # assert audio_feature.shape == audio_size, f"Audio feature shape mismatch: {audio_feature.shape} != {audio_size}"
+        # assert subclass_label.shape == subclass_size, f"Subclass label shape mismatch: {subclass_label.shape} != {subclass_size}"
     

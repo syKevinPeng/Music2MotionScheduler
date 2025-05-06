@@ -82,11 +82,60 @@ class LabelDownloader:
         all_label = {}
         for my_data in export_json:
             file_name, result = self.process_annotation_json(my_data)
+            result = self.post_process_label(file_name, result)
             # print(f'file name:{file_name}, result:{result}')
             all_label[file_name] = result
 
         return all_label
 
+    def post_process_label(self, file_name, label):
+        print(f'processing file: {file_name}')
+        dataset_path = Path("/fs/nexus-projects/PhysicsFall/data/motorica_dance_dataset")
+        motion_dataset_path = dataset_path/"npy"
+        sliced_motion_path = dataset_path/"synced_motion"
+        if not sliced_motion_path.exists():
+            sliced_motion_path.mkdir(parents=True, exist_ok=True)
+        # replace .mp4 with .npy
+        motion_file_name = file_name.replace('.mp4', '.npy')
+        motion_file_path = motion_dataset_path / motion_file_name
+        if not motion_file_path.exists():
+            raise FileNotFoundError(f"Motion file not found: {motion_file_path}")
+        # load motion data
+        motion_data_dict = np.load(motion_file_path, allow_pickle=True).item()
+        len_motion_data = len(motion_data_dict['motion_data'])
+        motion_fps = motion_data_dict['fps']
+        label_fps = 10
+        movement_in_label_fps_length = int(len_motion_data * label_fps / motion_fps)
+
+        # find the first occurance of 'End of Movement'
+        end_of_movement_index = np.where(label[1, :] == 'End of Movement')[0][0]
+
+        # remove the label after 'End of Movement'
+        if end_of_movement_index < movement_in_label_fps_length:
+            label = label[:, :end_of_movement_index]
+            movement_length = int(end_of_movement_index / label_fps * motion_fps)
+            motion_data_dict['motion_data'] = motion_data_dict['motion_data'][:movement_length]
+            motion_data_dict['motion_positions'] = motion_data_dict['motion_positions'][:movement_length]
+        # save the motion data
+        with open(sliced_motion_path / motion_file_name, 'wb') as f:
+            np.save(f, motion_data_dict)
+
+        # check if the label is fully filled: if any label is None
+        if label.any() == "None" or label.any() is None:
+            print(f'No label for {file_name}')
+            # TODO: if length of the None label is smaller than 5 frames, fill left part of label with previous label, fill right part of the label with future label
+            exit()
+        # merge 'Bruh what' with Random 
+        if label[1,:].any() == 'Bruh what':
+            print(f"Bruh what found: {label[1,:]}")
+            label[1, label[1, :] == 'Bruh what'] = 'Random'
+            print(f'after: {label[1,:]}')
+            exit()
+
+        return label
+
+
+ 
     def get_ontology(self, ontology_id = "cm6pbxeeu00o507wrcwf39bq0"):
         # get a list of all labels
         ontology = self.client.get_ontology(ontology_id)
@@ -139,12 +188,12 @@ if __name__ == '__main__':
         output_dir.mkdir(parents=True, exist_ok=True)
     
     # Initialize the LabelDownloader
-    downloader = LabelDownloader(LB_API_KEY, update_ontology_cache = True)
+    downloader = LabelDownloader(LB_API_KEY, update_ontology_cache = False)
     all_label = downloader.load_labeling(task_id)
-    # for file_name, label in all_label.items():
-    #     # save label to npy file
-    #     with open(output_dir/ f"{file_name.split('.')[0]}.pkl", 'wb') as f:
-    #         pickle.dump(label, f)
+    for file_name, label in all_label.items():
+        # save label to npy file
+        with open(output_dir/ f"{file_name.split('.')[0]}.pkl", 'wb') as f:
+            pickle.dump(label, f)
    
 
     

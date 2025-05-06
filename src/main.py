@@ -7,26 +7,42 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint
 import torch
 from pathlib import Path
+from Music2MotionScheduler.src.configs.defaults import get_cfg_defaults
 
-data_path = "/fs/nexus-projects/PhysicsFall/data/motorica_beats"
+# Load configuration
+cfg = get_cfg_defaults()
+config_file = Path(".")/"configs"/"baseline0.yaml"
+if not config_file.exists():
+    raise FileNotFoundError(f"Config file {config_file} does not exist")
+cfg.merge_from_file(config_file)
+cfg.freeze()
+
+
 saving_dir = Path("/fs/nexus-projects/PhysicsFall/Music2MotionScheduler/ckpt")
 
-max_epochs = 50
 
 # Initialize Wandb logger
-wandb_logger = WandbLogger(project='Music2MotionScheduler',
-                            name = "test",
-                            mode = "disabled",
-                            notes = "debugging")
+wandb_logger = WandbLogger(project=cfg.WANDB.PROJECT,
+                            name = cfg.WANDB.NAME,
+                            mode = cfg.WANDB.MODE,
+                            notes = cfg.WANDB.NOTES,
+                            config = cfg)
 
 # Initialize dataset and model
-data_module = SchdulerDataModule(dataset_path = data_path)
+data_module = SchdulerDataModule(dataset_path = cfg.DATASET.PATH, batch_size=cfg.TRAIN.BATCH_SIZE, label_format=cfg.DATASET.LABEL_FORMAT)
 batch_size, train_dummy_data, val_dummy_data=data_module.setup()
-seq_length, input_dim = train_dummy_data[0].shape
+# seq_length, input_dim = train_dummy_data[0].shape
+# print(f'seq_length: {seq_length}, input_dim: {input_dim}')
+# print(f'num labels: {len(data_module.dataset.label_converter.label_list)}')
+# exit()
 model = baseline.Baseline(
-    input_dim=input_dim,
-    num_labels=len(data_module.dataset.label_converter.label_list),
-    seq_length=seq_length
+    input_dim=cfg.MODEL.INPUT_DIM,
+    num_labels=cfg.MODEL.NUM_LABELS,
+    seq_length=cfg.MODEL.SEQ_LENGTH,
+    d_model = cfg.MODEL.DIM_MODEL,
+    nhead = cfg.MODEL.NHEAD,
+    num_layers = cfg.MODEL.NUM_LAYERS,
+
 )
 
 
@@ -34,7 +50,7 @@ exp_id = wandb_logger.experiment.id
 # Define checkpoint callback
 checkpoint_callback = pl.pytorch.callbacks.ModelCheckpoint(
     monitor='train_loss',
-    dirpath=str(saving_dir/exp_id),
+    dirpath=str(Path(cfg.WANDB.SAVE_DIR)/exp_id),
     filename='music_scheduler-{epoch:02d}-{train_loss:.2f}',
     mode='min',
     every_n_epochs=30,  
@@ -45,7 +61,7 @@ checkpoint_callback = pl.pytorch.callbacks.ModelCheckpoint(
 trainer = pl.Trainer(
     logger=wandb_logger,
     callbacks=[checkpoint_callback],
-    max_epochs=max_epochs
+    max_epochs=cfg.TRAIN.MAX_EPOCHS,
 )
 
 # Train the model
