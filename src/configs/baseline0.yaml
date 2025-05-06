@@ -1,0 +1,8 @@
+WANDB:
+  MODE: "online"
+
+DATASET:
+  LABEL_FORMAT: "number"
+
+TRAIN:
+  MAX_EPOCHS: 100
