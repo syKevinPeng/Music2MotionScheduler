@@ -90,7 +90,7 @@ class LabelDownloader:
 
     def post_process_label(self, file_name, label):
         print(f'processing file: {file_name}')
-        dataset_path = Path("/fs/nexus-projects/PhysicsFall/data/motorica_dance_dataset")
+        dataset_path = Path("/ihchomes/peng2000/editdance/data/motorica_dance_dataset")
         motion_dataset_path = dataset_path/"npy"
         sliced_motion_path = dataset_path/"synced_motion"
         if not sliced_motion_path.exists():
@@ -132,6 +132,10 @@ class LabelDownloader:
             print(f'after: {label[1,:]}')
             exit()
 
+        # setting the first and last label to 'Start of Sequence' and 'End of Sequence'
+        # check if the first label is 'Start of Sequence'
+        label[:,0] = ["Start of Sequence", "SOS"]
+        label[:,-1] = ["End of Sequence", "EOS"]
         return label
 
 
@@ -149,6 +153,10 @@ class LabelDownloader:
                 class_list.append([class_name, sub_name])
         # sort the class_name first and then the sub_class_name
         class_list.sort(key=lambda x: (x[0], x[1]))
+        # add ["Start of Sequence", "SOS"] to the beginning of the list
+        class_list.insert(0, ["Start of Sequence", "SOS"])
+        # rename ['random', 'End of Movement'] to ["End of Sequence", "EOS"]
+        class_list = [["End of Sequence", "EOS"] if item == ["random", "End of Movement"] else item for item in class_list]
         # save as txt
         with open('class_list.txt', 'w') as f:
             for item in class_list:
@@ -178,7 +186,7 @@ if __name__ == '__main__':
     from pathlib import Path
     import pickle
 
-    output_dir = Path("/fs/nexus-projects/PhysicsFall/data/motorica_dance_dataset")
+    output_dir = Path("/ihchomes/peng2000/editdance/data/motorica_dance_dataset")
 
     if not output_dir.exists():
         raise FileNotFoundError(f"Output directory not found: {output_dir}")
@@ -188,8 +196,9 @@ if __name__ == '__main__':
         output_dir.mkdir(parents=True, exist_ok=True)
     
     # Initialize the LabelDownloader
-    downloader = LabelDownloader(LB_API_KEY, update_ontology_cache = False)
+    downloader = LabelDownloader(LB_API_KEY, update_ontology_cache = True)
     all_label = downloader.load_labeling(task_id)
+    print(f'saveing to {output_dir}')
     for file_name, label in all_label.items():
         # save label to npy file
         with open(output_dir/ f"{file_name.split('.')[0]}.pkl", 'wb') as f:

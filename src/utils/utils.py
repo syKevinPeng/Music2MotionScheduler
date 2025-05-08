@@ -15,6 +15,9 @@ class LabelConverter:
                 raise FileNotFoundError(f"Label list file not found at {self.label_list_path}")
         self.load_label_list()
     
+    def get_length_labels(self):
+        return len(self.label_list)
+    
             
     def load_label_list(self):
         with open(self.label_list_path, "r") as f:

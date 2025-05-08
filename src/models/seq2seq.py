@@ -4,11 +4,17 @@ import torch.optim as optim
 import torch.nn.functional as F
 import lightning as pl
 import random
+from pathlib import Path
+from utils.utils import LabelConverter
 
 # Define special token indices - adjust as per your vocabulary
-PAD_IDX = 0
-SOS_IDX = 1  # Start Of Sequence
-EOS_IDX = 2  # End Of Sequence
+def initialize_special_tokens():
+    """Initialize special token indices for the model."""
+    label_converter = LabelConverter(label_list_path=Path(__file__).resolve().parent.parent / "data_processing" / "class_list.txt")
+    SOS_IDX = label_converter.subclass_label_to_number('SOS')  # Start Of Sequence
+    EOS_IDX = label_converter.subclass_label_to_number('EOS') # End Of Sequence
+    return SOS_IDX, EOS_IDX
+SOS_IDX, EOS_IDX = initialize_special_tokens()
 
 class MusicEncoder(nn.Module):
     """Encodes the input music feature sequence."""
@@ -85,7 +91,7 @@ class DanceDecoderStep(nn.Module):
         self.n_layers = n_layers
         
         # Embedding layer for input dance labels (previous prediction or ground truth)
-        self.embedding = nn.Embedding(dance_label_vocab_size, embed_dim, padding_idx=PAD_IDX)
+        self.embedding = nn.Embedding(dance_label_vocab_size, embed_dim)
         self.attention = attention_module
         
         # Decoder RNN (LSTM)
@@ -165,7 +171,7 @@ class Seq2SeqDanceGenerator(pl.LightningModule):
                                              n_layers, self.dropout_p, self.attention)
         
         # Loss function - CrossEntropyLoss ignores PAD_IDX in targets
-        self.criterion = nn.CrossEntropyLoss(ignore_index=PAD_IDX)
+        self.criterion = nn.CrossEntropyLoss()
 
     def forward(self, music_sequence, target_dance_sequence=None):
         # music_sequence: (batch_size, music_seq_len, music_feature_dim)
@@ -256,9 +262,8 @@ class Seq2SeqDanceGenerator(pl.LightningModule):
         # Calculate accuracy (optional, simple example)
         preds = torch.argmax(logits, dim=2)
         # Consider only non-padded elements for accuracy
-        non_pad_elements = (dance_seq_targets != PAD_IDX)
-        correct_predictions = (preds == dance_seq_targets) & non_pad_elements
-        accuracy = correct_predictions.sum().float() / non_pad_elements.sum().float()
+        correct_predictions = (preds == dance_seq_targets)
+        accuracy = correct_predictions.sum().float() / dance_seq_targets.numel()
         
         return loss, accuracy
 
@@ -337,11 +342,11 @@ if __name__ == '__main__':
     
     # Dummy target dance labels: (batch_size, dance_seq_len)
     # Labels should be integers from 0 to DANCE_LABEL_VOCAB_SIZE - 1
-    # Ensure PAD_IDX, SOS_IDX, EOS_IDX are handled in your actual data preparation
-    dummy_dance_labels = torch.randint(PAD_IDX + 1, DANCE_LABEL_VOCAB_SIZE, (BATCH_SIZE, DANCE_SEQ_LEN))
-    # Example: Make some sequences shorter by padding
-    dummy_dance_labels[0, DANCE_SEQ_LEN//2:] = PAD_IDX 
-    dummy_dance_labels[1, DANCE_SEQ_LEN-10:] = PAD_IDX 
+    # Ensure SOS_IDX and EOS_IDX are handled in your actual data preparation
+    dummy_dance_labels = torch.randint(0, DANCE_LABEL_VOCAB_SIZE, (BATCH_SIZE, DANCE_SEQ_LEN))
+    # Example: Make some sequences shorter by padding with EOS_IDX
+    dummy_dance_labels[0, DANCE_SEQ_LEN//2:] = EOS_IDX
+    dummy_dance_labels[1, DANCE_SEQ_LEN-10:] = EOS_IDX
 
     # --- Test Forward Pass (Training mode with teacher forcing) ---
     print("Testing forward pass (training mode)...")
